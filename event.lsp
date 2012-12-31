@@ -29,30 +29,45 @@
 
 ;;; Loop control
 (setf BASE 0)
+(setf RUNNING nil)
 
 (define (init)
   "Performs initialization of the event loop. Throws an error if unable to init
   the loop."
-  (or (setf BASE (libevent_base_new))
+  (cleanup)
+  (or BASE
+      (setf BASE (libevent_base_new))
       (throw-error "Error initializing event loop")))
+
+(define (cleanup)
+  "Cleans up memory used by the event loop."
+  (when RUNNING
+    (halt)
+    (setf RUNNING nil))
+
+  (when BASE
+    (libevent_base_free BASE)
+    (setf BASE 0)))
 
 (define (loop)
   "Starts the event loop. This function will not return until `stop` is
   called."
-  (when BASE
-    (libevent_base_loop BASE)))
+  (setf RUNNING true)
+  (libevent_base_loop BASE))
 
 (define (stop)
   "Stops the event loop."
-  (when BASE
-    (libevent_base_exit BASE)))
+  (libevent_base_exit BASE)
+  (cleanup))
 
 (define (halt)
   "Breaks the event loop immediately."
-  (when BASE
-    (libevent_base_break BASE)
-    (libevent_base_stop BASE)))
+  (libevent_base_break BASE)
+  (libevent_base_stop BASE)
+  (cleanup))
 
+
+;;; Event monitoring
 
 
 (context 'MAIN)
