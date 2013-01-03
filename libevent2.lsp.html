@@ -25,7 +25,8 @@
    <li>io buffers</li>
  </ul>
 <br/><br/>
-<b>Example:</b><blockquote><pre> (load "libevent2.lsp")
+<b>Example:</b><blockquote><pre> ; Initialize library
+ (load "libevent2.lsp")
  (libevent:init)
 
  ; Timers
@@ -59,7 +60,22 @@
  (libevent:run)
 
  ; print results
- (println (length buffer) " bytes received")</pre></blockquote>
+ (println buffer)</pre></blockquote>
+<br/><br/><center>&sect;</center><br/>
+<a name="_READ"></a><h3><font color=#CC0000>READ</font></h3>
+<b>syntax: <font color=#CC0000>READ</font></b><br/>
+ Event constant triggered when data is available to read.
+<br/><br/>
+<br/><br/><center>&sect;</center><br/>
+<a name="_WRITE"></a><h3><font color=#CC0000>WRITE</font></h3>
+<b>syntax: <font color=#CC0000>WRITE</font></b><br/>
+ Event constant triggered when data is available to write.
+
+
+
+
+
+
 <br/><br/><center>&sect;</center><br/>
 <a name="_init"></a><h3><font color=#CC0000>init</font></h3>
 <b>syntax: (<font color=#CC0000>init</font>)</b><br/>
@@ -72,8 +88,6 @@
 <a name="_run"></a><h3><font color=#CC0000>run</font></h3>
 <b>syntax: (<font color=#CC0000>run</font>)</b><br/>
  Starts the event loop. Does not return until the loop is stopped.
-
-
 
 <br/><br/><center>&sect;</center><br/>
 <a name="_stop"></a><h3><font color=#CC0000>stop</font></h3>
@@ -127,7 +141,7 @@
  callback is triggered, it is automatically unregistered for events <em>ev</em>.
  For example, the example code from <em>unwatch</em> could be rewritten as:
 <br/><br/>
-<b>Example:</b><blockquote><pre> (once socket WRITE
+<b>Example:</b><blockquote><pre> (watch-once socket WRITE
    (lambda (fd e)
      (write fd "Hello world")))</pre></blockquote>
 <br/><br/><center>&sect;</center><br/>
@@ -141,13 +155,19 @@
  iteration of the event loop after <em>msec</em> milliseconds have passed since its
  last execution. Returns an event ID that may be used to clear the interval
  event using <em>clear-interval</em>.
-
+<br/><br/>
+<b>Example:</b><blockquote><pre> (set-interval 500 (fn () (println "Another 500ms have passed")))</pre></blockquote>
 <br/><br/><center>&sect;</center><br/>
 <a name="_clear-interval"></a><h3><font color=#CC0000>clear-interval</font></h3>
 <b>syntax: (<font color=#CC0000>clear-interval</font> <em>id</em>)</b><br/>
 <b>parameter: </b><em>int</em> - <tt>id</tt> id of a timer event<br/>
  Clears an interval id.
-
+<br/><br/>
+<b>Example:</b><blockquote><pre> (setf n 10)
+ (set-interval 500
+   (fn (fd e id) ; fd is nil and e is TIMEOUT
+     (when (zero? (dec n))
+       (clear-interval id))))</pre></blockquote>
 <br/><br/><center>&sect;</center><br/>
 <a name="_set-timer"></a><h3><font color=#CC0000>set-timer</font></h3>
 <b>syntax: (<font color=#CC0000>set-timer</font> <em>msec</em> <em>cb</em>)</b><br/>
@@ -155,7 +175,8 @@
 <b>parameter: </b><em>fn</em> -  <tt>cb</tt>   A callback function<br/>
 <p><b>return: </b><em>int</em> Returns the timer id</p>
  Registers a callback <em>cb</em> to be executed one time after <em>msec</em> milliseconds.
-
+<br/><br/>
+<b>Example:</b><blockquote><pre> (set-timer 500 (fn () (println "500ms have elapsed.")))</pre></blockquote>
 
 <br/><br/><center>- &part; -</center><br/>
 <center><font face='Arial' size='-2' color='#444444'>

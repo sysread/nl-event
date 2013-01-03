@@ -14,6 +14,7 @@
 <font color='#555555'>;; &lt;/ul&gt;</font>
 <font color='#555555'>;;</font>
 <font color='#555555'>;; <font color='#308080'>@example</font></font>
+<font color='#555555'>;; ; Initialize library</font>
 <font color='#555555'>;; (load "libevent2.lsp")</font>
 <font color='#555555'>;; (libevent:init)</font>
 <font color='#555555'>;;</font>
@@ -48,7 +49,7 @@
 <font color='#555555'>;; (libevent:run)</font>
 <font color='#555555'>;;</font>
 <font color='#555555'>;; ; print results</font>
-<font color='#555555'>;; (println (length buffer) " bytes received")</font>
+<font color='#555555'>;; (println buffer)</font>
 
 <font color='#AA0000'>(</font><font color='#0000AA'>define</font> EventCB:EventCB<font color='#AA0000'>)</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>define</font> EventID:EventID<font color='#AA0000'>)</font>
@@ -60,12 +61,16 @@
 <font color='#555555'>;-------------------------------------------------------------------------------</font>
 <font color='#555555'>; Constants (from event.h)</font>
 <font color='#555555'>;-------------------------------------------------------------------------------</font>
+<font color='#555555'>;; <font color='#308080'>@syntax</font> READ</font>
+<font color='#555555'>;; Event constant triggered when data is available to read.</font>
+<font color='#555555'>;;</font>
+<font color='#555555'>;; <font color='#308080'>@syntax</font> WRITE</font>
+<font color='#555555'>;; Event constant triggered when data is available to write.</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>constant</font> 'TIMEOUT   <font color='#665500'>0x01</font><font color='#AA0000'>)</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>constant</font> 'READ      <font color='#665500'>0x02</font><font color='#AA0000'>)</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>constant</font> 'WRITE     <font color='#665500'>0x04</font><font color='#AA0000'>)</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>constant</font> 'SIGNAL    <font color='#665500'>0x08</font><font color='#AA0000'>)</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>constant</font> 'PERSIST   <font color='#665500'>0x10</font><font color='#AA0000'>)</font>
-<font color='#AA0000'>(</font><font color='#0000AA'>constant</font> 'LOOP_ONCE <font color='#665500'>0x01</font><font color='#AA0000'>)</font>
 
 <font color='#555555'>;-------------------------------------------------------------------------------</font>
 <font color='#555555'>; Locate libevent library</font>
@@ -85,7 +90,6 @@
 <font color='#AA0000'>(</font><font color='#0000AA'>import</font> LIB <font color='#008800'>"event_enable_debug_mode"</font><font color='#AA0000'>)</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>import</font> LIB <font color='#008800'>"event_base_new"</font> <font color='#008800'>"void*"</font><font color='#AA0000'>)</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>import</font> LIB <font color='#008800'>"event_base_free"</font> <font color='#008800'>"void"</font> <font color='#008800'>"void*"</font><font color='#AA0000'>)</font>
-<font color='#AA0000'>(</font><font color='#0000AA'>import</font> LIB <font color='#008800'>"event_base_loop"</font> <font color='#008800'>"int"</font> <font color='#008800'>"void*"</font> <font color='#008800'>"int"</font><font color='#AA0000'>)</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>import</font> LIB <font color='#008800'>"event_base_dispatch"</font> <font color='#008800'>"int"</font> <font color='#008800'>"void*"</font><font color='#AA0000'>)</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>import</font> LIB <font color='#008800'>"event_base_loopbreak"</font> <font color='#008800'>"int"</font> <font color='#008800'>"void*"</font><font color='#AA0000'>)</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>import</font> LIB <font color='#008800'>"event_new"</font> <font color='#008800'>"void*"</font> <font color='#008800'>"void*"</font> <font color='#008800'>"int"</font> <font color='#008800'>"short int"</font> <font color='#008800'>"void*"</font> <font color='#008800'>"void*"</font><font color='#AA0000'>)</font>
@@ -111,6 +115,8 @@
       <font color='#AA0000'>(</font><font color='#0000AA'>throw-error</font> <font color='#008800'>"Error initializing event loop"</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
 
 <font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>assert-initialized<font color='#AA0000'>)</font>
+  "Convenience routine to <font color='#0000AA'>throw</font> an error <font color='#0000AA'>if</font> the library has <font color='#0000AA'>not</font> yet been
+  initialized."
   <font color='#AA0000'>(</font><font color='#0000AA'>or</font> BASE <font color='#AA0000'>(</font><font color='#0000AA'>throw-error</font> <font color='#008800'>"Event loop is not initialized"</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
 
 <font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>cleanup<font color='#AA0000'>)</font>
@@ -129,16 +135,6 @@
     <font color='#AA0000'>(</font><font color='#665500'>1</font>  <font color='#AA0000'>(</font><font color='#0000AA'>throw-error</font> <font color='#008800'>"No more events registered."</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
     <font color='#AA0000'>(</font><font color='#665500'>-1</font> <font color='#AA0000'>(</font><font color='#0000AA'>throw-error</font> <font color='#008800'>"Unable to start loop."</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
 
-<font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>run-once , result<font color='#AA0000'>)</font>
-  <font color='#AA0000'>(</font><font color='#0000AA'>setf</font> RUNNING <font color='#0000AA'>true</font><font color='#AA0000'>)</font>
-  <font color='#AA0000'>(</font><font color='#0000AA'>setf</font> result <font color='#AA0000'>(</font>event_base_loop BASE LOOP_ONCE<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
-  <font color='#AA0000'>(</font><font color='#0000AA'>setf</font> RUNNING <font color='#0000AA'>nil</font><font color='#AA0000'>)</font>
-  <font color='#AA0000'>(</font><font color='#0000AA'>case</font> result
-    <font color='#AA0000'>(</font><font color='#665500'>0</font>  <font color='#0000AA'>true</font><font color='#AA0000'>)</font>
-    <font color='#AA0000'>(</font><font color='#665500'>1</font>  <font color='#AA0000'>(</font><font color='#0000AA'>throw-error</font> <font color='#008800'>"No more events registered."</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
-    <font color='#AA0000'>(</font><font color='#665500'>-1</font> <font color='#AA0000'>(</font><font color='#0000AA'>throw-error</font> <font color='#008800'>"Unable to start loop."</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
-
-
 <font color='#555555'>;; <font color='#308080'>@syntax</font> (stop)</font>
 <font color='#555555'>;; Halts the event loop after the next iteration.</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>stop<font color='#AA0000'>)</font>
@@ -152,19 +148,25 @@
 <font color='#555555'>;-------------------------------------------------------------------------------</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>setf</font> _id <font color='#665500'>0</font><font color='#AA0000'>)</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>event-id , id<font color='#AA0000'>)</font>
+  "Generates an id <font color='#0000AA'>for</font> the event, anchored in memory using a tree, that is used
+  to locate the event object from the callback."
   <font color='#AA0000'>(</font><font color='#0000AA'>setf</font> id <font color='#AA0000'>(</font><font color='#0000AA'>string</font> <font color='#008800'>"ev-"</font> <font color='#AA0000'>(</font><font color='#0000AA'>inc</font> _id<font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
   <font color='#AA0000'>(</font>EventID id id<font color='#AA0000'>)</font> <font color='#555555'>; anchor in memory</font>
   <font color='#AA0000'>(</font><font color='#0000AA'>list</font> <font color='#AA0000'>(</font>EventID id<font color='#AA0000'>)</font> <font color='#AA0000'>(</font><font color='#0000AA'>address</font> <font color='#AA0000'>(</font>EventID id<font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
 
 <font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>trigger fd ev arg , id event cb<font color='#AA0000'>)</font>
+  "Helper function that is called by libevent <font color='#0000AA'>and</font> calls the user-supplied
+  callback."
   <font color='#AA0000'>(</font><font color='#0000AA'>setf</font> id <font color='#AA0000'>(</font><font color='#0000AA'>get-string</font> arg<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
   <font color='#AA0000'>(</font><font color='#0000AA'>map</font> <font color='#0000AA'>set</font> '<font color='#AA0000'>(</font>event cb<font color='#AA0000'>)</font> <font color='#AA0000'>(</font>EventCB id<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
   <font color='#AA0000'>(</font>cb fd ev id<font color='#AA0000'>)</font>
   <font color='#665500'>0</font><font color='#AA0000'>)</font>
 
+<font color='#555555'>; Create callback for libevent</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>setf</font> _event_cb <font color='#AA0000'>(</font><font color='#0000AA'>callback</font> 'trigger <font color='#008800'>"void"</font> <font color='#008800'>"int"</font> <font color='#008800'>"short int"</font> <font color='#008800'>"void*"</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
 
 <font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>make-event fd ev cb once timeval, id event id-address<font color='#AA0000'>)</font>
+  <font color='#008800'>"Wrapper for event_new and event_add."</font>
   <font color='#AA0000'>(</font>assert-initialized<font color='#AA0000'>)</font>
 
   <font color='#AA0000'>(</font><font color='#0000AA'>unless</font> once <font color='#AA0000'>(</font><font color='#0000AA'>setf</font> ev <font color='#AA0000'>(</font><font color='#0000AA'>|</font> ev PERSIST<font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
@@ -231,7 +233,7 @@
 <font color='#555555'>;; For example, the example code from &lt;unwatch&gt; could be rewritten as:</font>
 <font color='#555555'>;;</font>
 <font color='#555555'>;; <font color='#308080'>@example</font></font>
-<font color='#555555'>;; (once socket WRITE</font>
+<font color='#555555'>;; (watch-once socket WRITE</font>
 <font color='#555555'>;;   (lambda (fd e)</font>
 <font color='#555555'>;;     (write fd "Hello world")))</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>watch-once fd ev cb<font color='#AA0000'>)</font>
@@ -249,6 +251,9 @@
 <font color='#555555'>;; iteration of the event loop after &lt;msec&gt; milliseconds have passed since its</font>
 <font color='#555555'>;; last execution. Returns an event ID that may be used to clear the interval</font>
 <font color='#555555'>;; event using &lt;clear-interval&gt;.</font>
+<font color='#555555'>;;</font>
+<font color='#555555'>;; <font color='#308080'>@example</font></font>
+<font color='#555555'>;; (set-interval 500 (fn () (println "Another 500ms have passed")))</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>set-interval msec cb<font color='#AA0000'>)</font>
   <font color='#AA0000'>(</font>assert-initialized<font color='#AA0000'>)</font>
   <font color='#AA0000'>(</font>make-event <font color='#665500'>-1</font> <font color='#AA0000'>(</font><font color='#0000AA'>|</font> <font color='#665500'>0</font> PERSIST<font color='#AA0000'>)</font> cb <font color='#0000AA'>nil</font> msec<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
@@ -256,6 +261,13 @@
 <font color='#555555'>;; <font color='#308080'>@syntax</font> (clear-interval &lt;id&gt;)</font>
 <font color='#555555'>;; <font color='#308080'>@param</font> &lt;int&gt; 'id' id of a timer event</font>
 <font color='#555555'>;; Clears an interval id.</font>
+<font color='#555555'>;;</font>
+<font color='#555555'>;; <font color='#308080'>@example</font></font>
+<font color='#555555'>;; (setf n 10)</font>
+<font color='#555555'>;; (set-interval 500</font>
+<font color='#555555'>;;   (fn (fd e id) ; fd is nil and e is TIMEOUT</font>
+<font color='#555555'>;;     (when (zero? (dec n))</font>
+<font color='#555555'>;;       (clear-interval id))))</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>clear-interval id<font color='#AA0000'>)</font>
   <font color='#AA0000'>(</font>unwatch id<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
 
@@ -264,6 +276,9 @@
 <font color='#555555'>;; <font color='#308080'>@param</font> &lt;fn&gt;  'cb'   A callback function</font>
 <font color='#555555'>;; <font color='#308080'>@return</font> &lt;int&gt; Returns the timer id</font>
 <font color='#555555'>;; Registers a callback &lt;cb&gt; to be executed one time after &lt;msec&gt; milliseconds.</font>
+<font color='#555555'>;;</font>
+<font color='#555555'>;; <font color='#308080'>@example</font></font>
+<font color='#555555'>;; (set-timer 500 (fn () (println "500ms have elapsed.")))</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>set-timer msec cb<font color='#AA0000'>)</font>
   <font color='#AA0000'>(</font>assert-initialized<font color='#AA0000'>)</font>
   <font color='#AA0000'>(</font>make-event <font color='#665500'>-1</font> <font color='#665500'>0</font> cb <font color='#0000AA'>nil</font> msec<font color='#AA0000'>)</font><font color='#AA0000'>)</font>

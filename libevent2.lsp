@@ -13,6 +13,7 @@
 ;; </ul>
 ;;
 ;; @example
+;; ; Initialize library
 ;; (load "libevent2.lsp")
 ;; (libevent:init)
 ;;
@@ -47,7 +48,7 @@
 ;; (libevent:run)
 ;;
 ;; ; print results
-;; (println (length buffer) " bytes received")
+;; (println buffer)
 
 (define EventCB:EventCB)
 (define EventID:EventID)
@@ -59,12 +60,16 @@
 ;-------------------------------------------------------------------------------
 ; Constants (from event.h)
 ;-------------------------------------------------------------------------------
+;; @syntax READ
+;; Event constant triggered when data is available to read.
+;;
+;; @syntax WRITE
+;; Event constant triggered when data is available to write.
 (constant 'TIMEOUT   0x01)
 (constant 'READ      0x02)
 (constant 'WRITE     0x04)
 (constant 'SIGNAL    0x08)
 (constant 'PERSIST   0x10)
-(constant 'LOOP_ONCE 0x01)
 
 ;-------------------------------------------------------------------------------
 ; Locate libevent library
@@ -84,7 +89,6 @@
 (import LIB "event_enable_debug_mode")
 (import LIB "event_base_new" "void*")
 (import LIB "event_base_free" "void" "void*")
-(import LIB "event_base_loop" "int" "void*" "int")
 (import LIB "event_base_dispatch" "int" "void*")
 (import LIB "event_base_loopbreak" "int" "void*")
 (import LIB "event_new" "void*" "void*" "int" "short int" "void*" "void*")
@@ -110,6 +114,8 @@
       (throw-error "Error initializing event loop")))
 
 (define (assert-initialized)
+  "Convenience routine to throw an error if the library has not yet been
+  initialized."
   (or BASE (throw-error "Event loop is not initialized")))
 
 (define (cleanup)
@@ -128,16 +134,6 @@
     (1  (throw-error "No more events registered."))
     (-1 (throw-error "Unable to start loop."))))
 
-(define (run-once , result)
-  (setf RUNNING true)
-  (setf result (event_base_loop BASE LOOP_ONCE))
-  (setf RUNNING nil)
-  (case result
-    (0  true)
-    (1  (throw-error "No more events registered."))
-    (-1 (throw-error "Unable to start loop."))))
-
-
 ;; @syntax (stop)
 ;; Halts the event loop after the next iteration.
 (define (stop)
@@ -151,19 +147,25 @@
 ;-------------------------------------------------------------------------------
 (setf _id 0)
 (define (event-id , id)
+  "Generates an id for the event, anchored in memory using a tree, that is used
+  to locate the event object from the callback."
   (setf id (string "ev-" (inc _id)))
   (EventID id id) ; anchor in memory
   (list (EventID id) (address (EventID id))))
 
 (define (trigger fd ev arg , id event cb)
+  "Helper function that is called by libevent and calls the user-supplied
+  callback."
   (setf id (get-string arg))
   (map set '(event cb) (EventCB id))
   (cb fd ev id)
   0)
 
+; Create callback for libevent
 (setf _event_cb (callback 'trigger "void" "int" "short int" "void*"))
 
 (define (make-event fd ev cb once timeval, id event id-address)
+  "Wrapper for event_new and event_add."
   (assert-initialized)
 
   (unless once (setf ev (| ev PERSIST)))
@@ -230,7 +232,7 @@
 ;; For example, the example code from <unwatch> could be rewritten as:
 ;;
 ;; @example
-;; (once socket WRITE
+;; (watch-once socket WRITE
 ;;   (lambda (fd e)
 ;;     (write fd "Hello world")))
 (define (watch-once fd ev cb)
@@ -248,6 +250,9 @@
 ;; iteration of the event loop after <msec> milliseconds have passed since its
 ;; last execution. Returns an event ID that may be used to clear the interval
 ;; event using <clear-interval>.
+;;
+;; @example
+;; (set-interval 500 (fn () (println "Another 500ms have passed")))
 (define (set-interval msec cb)
   (assert-initialized)
   (make-event -1 (| 0 PERSIST) cb nil msec))
@@ -255,6 +260,13 @@
 ;; @syntax (clear-interval <id>)
 ;; @param <int> 'id' id of a timer event
 ;; Clears an interval id.
+;;
+;; @example
+;; (setf n 10)
+;; (set-interval 500
+;;   (fn (fd e id) ; fd is nil and e is TIMEOUT
+;;     (when (zero? (dec n))
+;;       (clear-interval id))))
 (define (clear-interval id)
   (unwatch id))
 
@@ -263,6 +275,9 @@
 ;; @param <fn>  'cb'   A callback function
 ;; @return <int> Returns the timer id
 ;; Registers a callback <cb> to be executed one time after <msec> milliseconds.
+;;
+;; @example
+;; (set-timer 500 (fn () (println "500ms have elapsed.")))
 (define (set-timer msec cb)
   (assert-initialized)
   (make-event -1 0 cb nil msec))
