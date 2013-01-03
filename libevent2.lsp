@@ -2,6 +2,52 @@
 ;; @description Low-level newlisp bindings for libevent2.
 ;; @version 0.1
 ;; @author Jeff Ober <jeffober@gmail.com>
+;;
+;; The libevent module provides a thin wrapper on top of the
+;; @link http://libevent.org/ libevent2 library.
+;;
+;; TODO
+;; <ul>
+;;   <li>signals</li>
+;;   <li>io buffers</li>
+;; </ul>
+;;
+;; @example
+;; (load "libevent2.lsp")
+;; (libevent:init)
+;;
+;; ; Timers
+;; (libevent:set-interval 10
+;;   (fn () (println "Another 10ms have passed!")))
+;;
+;; ; IO
+;; (setf socket (net-connect "www.google.com" 80))
+;; (setf buffer "")
+;;
+;; ; Wait until socket is write-ready
+;; (libevent:watch-once socket libevent:WRITE
+;;   (fn (fd e id)
+;;     ; send HTTP request
+;;     (write socket "GET / HTTP/1.0\r\n\r\n")
+;;
+;;     ; wait for response
+;;     (libevent:watch socket libevent:READ
+;;       (fn (fd e id , buf bytes)
+;;         ; read to local buffer
+;;         (setf bytes (read fd buf 4096))
+;;         (if bytes
+;;           ; write to global buffer
+;;           (write buffer buf)
+;;           ; kill watcher and stop loop
+;;           (begin
+;;             (libevent:unwatch id)
+;;             (libevent:stop)))))))
+;;
+;; ; start event loop
+;; (libevent:run)
+;;
+;; ; print results
+;; (println (length buffer) " bytes received")
 
 (define EventCB:EventCB)
 (define EventID:EventID)
@@ -19,9 +65,6 @@
 (constant 'SIGNAL    0x08)
 (constant 'PERSIST   0x10)
 (constant 'LOOP_ONCE 0x01)
-
-(constant 'EVENT_TYPES (list TIMEOUT READ WRITE SIGNAL PERSIST))
-(constant 'EVENT_ALL   (apply '| EVENT_TYPES))
 
 ;-------------------------------------------------------------------------------
 ; Locate libevent library
@@ -48,7 +91,6 @@
 (import LIB "event_free" "void" "void*")
 (import LIB "event_add" "int" "void*" "void*")
 (import LIB "event_del" "int" "void*")
-(import LIB "event_active" "void" "void*" "int" "short int")
 
 (when MAIN:LIBEVENT2_DEBUG
   (event_enable_debug_mode))
@@ -114,7 +156,6 @@
   (list (EventID id) (address (EventID id))))
 
 (define (trigger fd ev arg , id event cb)
-  (println "TRIGGER " fd ", " ev ", " arg)
   (setf id (get-string arg))
   (map set '(event cb) (EventCB id))
   (cb fd ev id)
@@ -131,8 +172,10 @@
   (setf event (event_new BASE fd ev _event_cb id-address))
   (EventCB id (list event cb))
 
-  (when timeval
-    (setf timeval (pack TIMEVAL 0 (* 1000 timeval)))) ; convert usec to msec
+  (setf timeval
+    (if timeval
+      (pack TIMEVAL 0 (* 1000 timeval)) ; convert usec to msec
+      0))
 
   (unless (zero? (event_add event (address timeval)))
     (throw-error "Error adding event"))
@@ -196,33 +239,32 @@
 ;-------------------------------------------------------------------------------
 ; Timers
 ;-------------------------------------------------------------------------------
-;; @syntax (interval <msec> <cb>)
+;; @syntax (set-interval <msec> <cb>)
 ;; @param <int> 'msec' Millisecond interval
 ;; @param <fn>  'cb'   A callback function
 ;; @return <int> Returns the timer id
-(define (interval msec cb)
+;; Registers a callback <cb> to be executed every <msec> milliseconds. Note
+;; that the timing is not guaranteed; <cb> will be called on the first
+;; iteration of the event loop after <msec> milliseconds have passed since its
+;; last execution. Returns an event ID that may be used to clear the interval
+;; event using <clear-interval>.
+(define (set-interval msec cb)
   (assert-initialized)
   (make-event -1 (| 0 PERSIST) cb nil msec))
 
 ;; @syntax (clear-interval <id>)
 ;; @param <int> 'id' id of a timer event
+;; Clears an interval id.
 (define (clear-interval id)
   (unwatch id))
 
-;; @syntax (after <msec> <cb>)
+;; @syntax (set-timer <msec> <cb>)
 ;; @param <int> 'msec' Millisecond interval
 ;; @param <fn>  'cb'   A callback function
 ;; @return <int> Returns the timer id
-(define (after msec cb)
+;; Registers a callback <cb> to be executed one time after <msec> milliseconds.
+(define (set-timer msec cb)
   (assert-initialized)
   (make-event -1 0 cb nil msec))
-
-;-------------------------------------------------------------------------------
-; Signals
-;-------------------------------------------------------------------------------
-
-
-
-
 
 (context 'MAIN)

@@ -15,17 +15,51 @@
 <h2>Module:&nbsp;libevent</h2><p>Low-level newlisp bindings for libevent2.</p>
 <b>Version: </b>0.1<br/>
 <b>Author: </b>Jeff Ober <jeffober@gmail.com><br/>
+<br/><br/>
+ The libevent module provides a thin wrapper on top of the
+ <a href="http://libevent.org/">libevent2</a> library.
+<br/><br/>
+ TODO
+ <ul>
+   <li>signals</li>
+   <li>io buffers</li>
+ </ul>
+<br/><br/>
+<b>Example:</b><blockquote><pre> (load "libevent2.lsp")
+ (libevent:init)
 
+ ; Timers
+ (libevent:set-interval 10
+   (fn () (println "Another 10ms have passed!")))
 
+ ; IO
+ (setf socket (net-connect "www.google.com" 80))
+ (setf buffer "")
 
+ ; Wait until socket is write-ready
+ (libevent:watch-once socket libevent:WRITE
+   (fn (fd e id)
+     ; send HTTP request
+     (write socket "GET / HTTP/1.0\r\n\r\n")
 
+     ; wait for response
+     (libevent:watch socket libevent:READ
+       (fn (fd e id , buf bytes)
+         ; read to local buffer
+         (setf bytes (read fd buf 4096))
+         (if bytes
+           ; write to global buffer
+           (write buffer buf)
+           ; kill watcher and stop loop
+           (begin
+             (libevent:unwatch id)
+             (libevent:stop)))))))
 
+ ; start event loop
+ (libevent:run)
 
-
-
-
-
-
+ ; print results
+ (println (length buffer) " bytes received")</pre></blockquote>
 <br/><br/><center>&sect;</center><br/>
 <a name="_init"></a><h3><font color=#CC0000>init</font></h3>
 <b>syntax: (<font color=#CC0000>init</font>)</b><br/>
@@ -97,28 +131,30 @@
    (lambda (fd e)
      (write fd "Hello world")))</pre></blockquote>
 <br/><br/><center>&sect;</center><br/>
-<a name="_interval"></a><h3><font color=#CC0000>interval</font></h3>
-<b>syntax: (<font color=#CC0000>interval</font> <em>msec</em> <em>cb</em>)</b><br/>
+<a name="_set-interval"></a><h3><font color=#CC0000>set-interval</font></h3>
+<b>syntax: (<font color=#CC0000>set-interval</font> <em>msec</em> <em>cb</em>)</b><br/>
 <b>parameter: </b><em>int</em> - <tt>msec</tt> Millisecond interval<br/>
 <b>parameter: </b><em>fn</em> -  <tt>cb</tt>   A callback function<br/>
 <p><b>return: </b><em>int</em> Returns the timer id</p>
+ Registers a callback <em>cb</em> to be executed every <em>msec</em> milliseconds. Note
+ that the timing is not guaranteed; <em>cb</em> will be called on the first
+ iteration of the event loop after <em>msec</em> milliseconds have passed since its
+ last execution. Returns an event ID that may be used to clear the interval
+ event using <em>clear-interval</em>.
 
 <br/><br/><center>&sect;</center><br/>
 <a name="_clear-interval"></a><h3><font color=#CC0000>clear-interval</font></h3>
 <b>syntax: (<font color=#CC0000>clear-interval</font> <em>id</em>)</b><br/>
 <b>parameter: </b><em>int</em> - <tt>id</tt> id of a timer event<br/>
+ Clears an interval id.
 
 <br/><br/><center>&sect;</center><br/>
-<a name="_after"></a><h3><font color=#CC0000>after</font></h3>
-<b>syntax: (<font color=#CC0000>after</font> <em>msec</em> <em>cb</em>)</b><br/>
+<a name="_set-timer"></a><h3><font color=#CC0000>set-timer</font></h3>
+<b>syntax: (<font color=#CC0000>set-timer</font> <em>msec</em> <em>cb</em>)</b><br/>
 <b>parameter: </b><em>int</em> - <tt>msec</tt> Millisecond interval<br/>
 <b>parameter: </b><em>fn</em> -  <tt>cb</tt>   A callback function<br/>
 <p><b>return: </b><em>int</em> Returns the timer id</p>
-
-
-
-
-
+ Registers a callback <em>cb</em> to be executed one time after <em>msec</em> milliseconds.
 
 
 <br/><br/><center>- &part; -</center><br/>
