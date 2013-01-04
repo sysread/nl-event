@@ -16,24 +16,29 @@
 <b>Version: </b>0.1<br/>
 <b>Author: </b>Jeff Ober <jeffober@gmail.com><br/>
 <br/><br/>
- The libevent module provides a thin wrapper on top of the
+ The libevent module provides a wrapper on top of the
  <a href="http://libevent.org/">libevent2</a> library.
 <br/><br/>
  TODO
  <ul>
    <li>signals</li>
-   <li>io buffers</li>
  </ul>
 <br/><br/>
-<b>Example:</b><blockquote><pre> ; Initialize library
- (load "libevent2.lsp")
+<b>Example:</b><blockquote><pre> ; ------------------------------------------------------------------------------
+ ; Timers
+ ; ------------------------------------------------------------------------------
  (libevent:init)
 
- ; Timers
  (libevent:set-interval 10
    (fn () (println "Another 10ms have passed!")))
 
+ (libevent:run)
+
+
+ ; ------------------------------------------------------------------------------
  ; IO
+ ; ------------------------------------------------------------------------------
+ (libevent:init)
  (setf socket (net-connect "www.google.com" 80))
  (setf buffer "")
 
@@ -56,20 +61,59 @@
              (libevent:unwatch id)
              (libevent:stop)))))))
 
- ; start event loop
  (libevent:run)
+ (println buffer)
 
- ; print results
- (println buffer)</pre></blockquote>
-<br/><br/><center>&sect;</center><br/>
-<a name="_READ"></a><h3><font color=#CC0000>READ</font></h3>
-<b>syntax: <font color=#CC0000>READ</font></b><br/>
- Event constant triggered when data is available to read.
-<br/><br/>
-<br/><br/><center>&sect;</center><br/>
-<a name="_WRITE"></a><h3><font color=#CC0000>WRITE</font></h3>
-<b>syntax: <font color=#CC0000>WRITE</font></b><br/>
- Event constant triggered when data is available to write.
+
+ ; ------------------------------------------------------------------------------
+ ; Using buffers
+ ; ------------------------------------------------------------------------------
+ (libevent:init)
+ 
+ (setf html "")
+ 
+ (define (on-read data)
+   (write html data))
+ 
+ (define (on-event ev data)
+   (cond
+     ((libevent:masks? ev libevent:BUFFER_EOF)
+      (write html data)
+      (println "Disconnected")
+      (libevent:stop))
+     ((libevent:masks? ev libevent:BUFFER_ERROR)
+      (println "An error occurred")
+      (libevent:stop))
+     ((libevent:masks? ev libevent:BUFFER_TIMEOUT)
+      (println "Timed out")
+      (libevent:stop))))
+ 
+ (or (setf socket (net-connect "www.google.com" 80))
+     (throw-error "Unable to connect"))
+ 
+ (setf buffer (libevent:make-buffer socket (regex-comp "[\r\n]+" 4) on-read on-event))
+ (libevent:buffer-send buffer "GET / HTTP/1.0\r\n\r\n")
+ (libevent:run)
+ 
+ (println html)</pre></blockquote>
+ <h3>Event constants</h3>
+<b>Const: </b>READ<br/>
+<b>Const: </b>WRITE<br/>
+<b>Const: </b>TIMEOUT<br/>
+<b>Const: </b>SIGNAL<br/>
+
+ <h3>Buffer constants</h3>
+<b>Const: </b>BUFFER_READING<br/>
+<b>Const: </b>BUFFER_WRITING<br/>
+<b>Const: </b>BUFFER_EOF<br/>
+<b>Const: </b>BUFFER_ERROR<br/>
+<b>Const: </b>BUFFER_TIMEOUT<br/>
+<b>Const: </b>BUFFER_CONNECTED<br/>
+
+
+
+
+
 
 
 
@@ -81,6 +125,7 @@
 <b>syntax: (<font color=#CC0000>init</font>)</b><br/>
  Initializes the event loop. Will not re-init a previously initialized
  loop unless <em>cleanup</em> is called first.
+
 
 
 
@@ -110,7 +155,7 @@
 <b>parameter: </b><em>int</em> -  <tt>ev</tt>   A bitmask of event constants<br/>
 <b>parameter: </b><em>fn</em> -   <tt>cb</tt>   A callback function<br/>
 <b>parameter: </b><em>bool</em> - <tt>once</tt> When true (default false) callback is triggered only once<br/>
-<p><b>return: </b><em>int</em> id used to manage the event watcher</p>
+<p><b>return: </b><em>string</em> id used to manage the event watcher</p>
  Registers callback function <em>cb</em> to be called whenever an event masked in
  <em>ev</em> is triggered for <em>fd</em>. <em>cb</em> is called with the file descriptor,
  event, and id as its arguments.
@@ -123,7 +168,7 @@
 <br/><br/><center>&sect;</center><br/>
 <a name="_unwatch"></a><h3><font color=#CC0000>unwatch</font></h3>
 <b>syntax: (<font color=#CC0000>unwatch</font> <em>id</em>)</b><br/>
-<b>parameter: </b><em>int</em> - <tt>id</tt> ID returned by <em>watch</em><br/>
+<b>parameter: </b><em>string</em> - <tt>id</tt> ID returned by <em>watch</em><br/>
  Unregisters an event watcher. Once unwatched, the watcher id is invalid
  and may no longer be used.
 <br/><br/>
@@ -149,7 +194,7 @@
 <b>syntax: (<font color=#CC0000>set-interval</font> <em>msec</em> <em>cb</em>)</b><br/>
 <b>parameter: </b><em>int</em> - <tt>msec</tt> Millisecond interval<br/>
 <b>parameter: </b><em>fn</em> -  <tt>cb</tt>   A callback function<br/>
-<p><b>return: </b><em>int</em> Returns the timer id</p>
+<p><b>return: </b><em>string</em> Returns the timer id</p>
  Registers a callback <em>cb</em> to be executed every <em>msec</em> milliseconds. Note
  that the timing is not guaranteed; <em>cb</em> will be called on the first
  iteration of the event loop after <em>msec</em> milliseconds have passed since its
@@ -160,7 +205,7 @@
 <br/><br/><center>&sect;</center><br/>
 <a name="_clear-interval"></a><h3><font color=#CC0000>clear-interval</font></h3>
 <b>syntax: (<font color=#CC0000>clear-interval</font> <em>id</em>)</b><br/>
-<b>parameter: </b><em>int</em> - <tt>id</tt> id of a timer event<br/>
+<b>parameter: </b><em>string</em> - <tt>id</tt> id of a timer event<br/>
  Clears an interval id.
 <br/><br/>
 <b>Example:</b><blockquote><pre> (setf n 10)
@@ -173,10 +218,43 @@
 <b>syntax: (<font color=#CC0000>set-timer</font> <em>msec</em> <em>cb</em>)</b><br/>
 <b>parameter: </b><em>int</em> - <tt>msec</tt> Millisecond interval<br/>
 <b>parameter: </b><em>fn</em> -  <tt>cb</tt>   A callback function<br/>
-<p><b>return: </b><em>int</em> Returns the timer id</p>
+<p><b>return: </b><em>string</em> Returns the timer id</p>
  Registers a callback <em>cb</em> to be executed one time after <em>msec</em> milliseconds.
 <br/><br/>
 <b>Example:</b><blockquote><pre> (set-timer 500 (fn () (println "500ms have elapsed.")))</pre></blockquote>
+<br/><br/><center>&sect;</center><br/>
+<a name="_make-buffer"></a><h3><font color=#CC0000>make-buffer</font></h3>
+<b>syntax: (<font color=#CC0000>make-buffer</font> <em>socket</em> <em>read-marker</em> <em>on-read</em> <em>on-event</em>)</b><br/>
+<b>parameter: </b><em>int</em> -    <tt>socket</tt> an open socket; must not be a pipe<br/>
+<b>parameter: </b><em>regex</em> -  <tt>read-marker</tt> a compiled regex<br/>
+<b>parameter: </b><em>fn</em> -     <tt>on-read</tt><br/>
+<b>parameter: </b><em>fn</em> -     <tt>on-event</tt><br/>
+<p><b>return: </b><em>string</em> an id used to identify the buffer</p>
+ Creates a new buffer object. Configures buffer to call <em>on-read</em> whenever
+ the buffer is able to match its contents against pre-compiled regex
+ <em>read-marker</em>. <em>on-event</em> is triggered in the event of a disconnected
+ socket, error, etc.
+
+
+
+
+
+
+<br/><br/><center>&sect;</center><br/>
+<a name="_free-buffer"></a><h3><font color=#CC0000>free-buffer</font></h3>
+<b>syntax: (<font color=#CC0000>free-buffer</font> <em>id</em>)</b><br/>
+<b>parameter: </b><em>string</em> - <tt>id</tt> buffer id<br/>
+ Cleans up after a buffer. The buffer is not usable after calling this
+ routine.
+
+<br/><br/><center>&sect;</center><br/>
+<a name="_buffer-send"></a><h3><font color=#CC0000>buffer-send</font></h3>
+<b>syntax: (<font color=#CC0000>buffer-send</font> <em>id</em> <em>data</em>)</b><br/>
+<b>parameter: </b><em>string</em> - <tt>id</tt> buffer id<br/>
+<b>parameter: </b><em>string</em> - <tt>data</tt> data to send<br/>
+ Queues <em>data</em> to be sent along the socket transport of buffer <em>buffer-id</em>.
+
+
 
 <br/><br/><center>- &part; -</center><br/>
 <center><font face='Arial' size='-2' color='#444444'>

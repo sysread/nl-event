@@ -3,25 +3,30 @@
 ;; @version 0.1
 ;; @author Jeff Ober <jeffober@gmail.com>
 ;;
-;; The libevent module provides a thin wrapper on top of the
+;; The libevent module provides a wrapper on top of the
 ;; @link http://libevent.org/ libevent2 library.
 ;;
 ;; TODO
 ;; <ul>
 ;;   <li>signals</li>
-;;   <li>io buffers</li>
 ;; </ul>
 ;;
 ;; @example
-;; ; Initialize library
-;; (load "libevent2.lsp")
+;; ; ------------------------------------------------------------------------------
+;; ; Timers
+;; ; ------------------------------------------------------------------------------
 ;; (libevent:init)
 ;;
-;; ; Timers
 ;; (libevent:set-interval 10
 ;;   (fn () (println "Another 10ms have passed!")))
 ;;
+;; (libevent:run)
+;;
+;;
+;; ; ------------------------------------------------------------------------------
 ;; ; IO
+;; ; ------------------------------------------------------------------------------
+;; (libevent:init)
 ;; (setf socket (net-connect "www.google.com" 80))
 ;; (setf buffer "")
 ;;
@@ -44,14 +49,52 @@
 ;;             (libevent:unwatch id)
 ;;             (libevent:stop)))))))
 ;;
-;; ; start event loop
 ;; (libevent:run)
-;;
-;; ; print results
 ;; (println buffer)
+;;
+;;
+;; ; ------------------------------------------------------------------------------
+;; ; Using buffers
+;; ; ------------------------------------------------------------------------------
+;; (libevent:init)
+;; 
+;; (setf html "")
+;; 
+;; (define (on-read data)
+;;   (write html data))
+;; 
+;; (define (on-event ev data)
+;;   (cond
+;;     ((libevent:masks? ev libevent:BUFFER_EOF)
+;;      (write html data)
+;;      (println "Disconnected")
+;;      (libevent:stop))
+;;     ((libevent:masks? ev libevent:BUFFER_ERROR)
+;;      (println "An error occurred")
+;;      (libevent:stop))
+;;     ((libevent:masks? ev libevent:BUFFER_TIMEOUT)
+;;      (println "Timed out")
+;;      (libevent:stop))))
+;; 
+;; (or (setf socket (net-connect "www.google.com" 80))
+;;     (throw-error "Unable to connect"))
+;; 
+;; (setf buffer (libevent:make-buffer socket (regex-comp "[\r\n]+" 4) on-read on-event))
+;; (libevent:buffer-send buffer "GET / HTTP/1.0\r\n\r\n")
+;; (libevent:run)
+;; 
+;; (println html)
 
-(define EventCB:EventCB)
+;-------------------------------------------------------------------------------
+;Data storage
+;-------------------------------------------------------------------------------
 (define EventID:EventID)
+(define EventCB:EventCB)
+
+(define BufferID:BufferID)
+(define BufferCB:BufferCB)
+(define BufferEv:BufferEv)
+(define BufferData:BufferData)
 
 (context 'libevent)
 
@@ -60,16 +103,37 @@
 ;-------------------------------------------------------------------------------
 ; Constants (from event.h)
 ;-------------------------------------------------------------------------------
-;; @syntax READ
-;; Event constant triggered when data is available to read.
-;;
-;; @syntax WRITE
-;; Event constant triggered when data is available to write.
+;; <h3>Event constants</h3>
+;; @const READ
+;; @const WRITE
+;; @const TIMEOUT
+;; @const SIGNAL
 (constant 'TIMEOUT   0x01)
 (constant 'READ      0x02)
 (constant 'WRITE     0x04)
 (constant 'SIGNAL    0x08)
 (constant 'PERSIST   0x10)
+
+; Buffer events
+;; <h3>Buffer constants</h3>
+;; @const BUFFER_READING
+;; @const BUFFER_WRITING
+;; @const BUFFER_EOF
+;; @const BUFFER_ERROR
+;; @const BUFFER_TIMEOUT
+;; @const BUFFER_CONNECTED
+(constant 'BUFFER_READING   0x01)
+(constant 'BUFFER_WRITING   0x02)
+(constant 'BUFFER_EOF       0x10)
+(constant 'BUFFER_ERROR     0x20)
+(constant 'BUFFER_TIMEOUT   0x40)
+(constant 'BUFFER_CONNECTED 0x80)
+
+; Buffer options
+(constant 'BUFFER_OPT_DEFER_CALLBACKS (<< 1 2))
+
+; Defaults
+(constant 'DEFAULT_CHUNK_SIZE 1024)
 
 ;-------------------------------------------------------------------------------
 ; Locate libevent library
@@ -91,13 +155,28 @@
 (import LIB "event_base_free" "void" "void*")
 (import LIB "event_base_dispatch" "int" "void*")
 (import LIB "event_base_loopbreak" "int" "void*")
+
 (import LIB "event_new" "void*" "void*" "int" "short int" "void*" "void*")
 (import LIB "event_free" "void" "void*")
 (import LIB "event_add" "int" "void*" "void*")
 (import LIB "event_del" "int" "void*")
 
+(import LIB "bufferevent_socket_new" "void*" "void*" "int" "int")
+(import LIB "bufferevent_free" "void" "void*")
+(import LIB "bufferevent_enable" "int" "void*" "short int")
+(import LIB "bufferevent_disable" "int" "void*" "short int")
+(import LIB "bufferevent_read" "int" "void*" "void*" "int")
+(import LIB "bufferevent_write" "int" "void*" "void*" "int")
+(import LIB "bufferevent_setcb" "void" "void*" "void*" "void*" "void*" "void*")
+
 (when MAIN:LIBEVENT2_DEBUG
   (event_enable_debug_mode))
+
+;-------------------------------------------------------------------------------
+;Utilities
+;-------------------------------------------------------------------------------
+(define (masks? a b)
+  (not (zero? (& a b))))
 
 ;-------------------------------------------------------------------------------
 ; Loop control
@@ -113,10 +192,15 @@
       (not (zero? (setf BASE (event_base_new))))
       (throw-error "Error initializing event loop")))
 
+(define (initialized?)
+  "Returns true if libevent has been initialized."
+  (true? BASE))
+
 (define (assert-initialized)
   "Convenience routine to throw an error if the library has not yet been
   initialized."
-  (or BASE (throw-error "Event loop is not initialized")))
+  (unless (initialized?)
+    (throw-error "Event loop is not initialized")))
 
 (define (cleanup)
   "Cleans up memory used by the event loop."
@@ -145,11 +229,10 @@
 ;-------------------------------------------------------------------------------
 ; Event callback triggering
 ;-------------------------------------------------------------------------------
-(setf _id 0)
 (define (event-id , id)
   "Generates an id for the event, anchored in memory using a tree, that is used
   to locate the event object from the callback."
-  (setf id (string "ev-" (inc _id)))
+  (setf id (string (inc _event_id)))
   (EventID id id) ; anchor in memory
   (list (EventID id) (address (EventID id))))
 
@@ -192,7 +275,7 @@
 ;; @param <int>  'ev'   A bitmask of event constants
 ;; @param <fn>   'cb'   A callback function
 ;; @param <bool> 'once' When true (default false) callback is triggered only once
-;; @return <int> id used to manage the event watcher
+;; @return <string> id used to manage the event watcher
 ;; Registers callback function <cb> to be called whenever an event masked in
 ;; <ev> is triggered for <fd>. <cb> is called with the file descriptor,
 ;; event, and id as its arguments.
@@ -208,7 +291,7 @@
   (make-event fd ev cb once))
 
 ;; @syntax (unwatch <id>)
-;; @param <int> 'id' ID returned by <watch>
+;; @param <string> 'id' ID returned by <watch>
 ;; Unregisters an event watcher. Once unwatched, the watcher id is invalid
 ;; and may no longer be used.
 ;;
@@ -244,7 +327,7 @@
 ;; @syntax (set-interval <msec> <cb>)
 ;; @param <int> 'msec' Millisecond interval
 ;; @param <fn>  'cb'   A callback function
-;; @return <int> Returns the timer id
+;; @return <string> Returns the timer id
 ;; Registers a callback <cb> to be executed every <msec> milliseconds. Note
 ;; that the timing is not guaranteed; <cb> will be called on the first
 ;; iteration of the event loop after <msec> milliseconds have passed since its
@@ -258,7 +341,7 @@
   (make-event -1 (| 0 PERSIST) cb nil msec))
 
 ;; @syntax (clear-interval <id>)
-;; @param <int> 'id' id of a timer event
+;; @param <string> 'id' id of a timer event
 ;; Clears an interval id.
 ;;
 ;; @example
@@ -273,7 +356,7 @@
 ;; @syntax (set-timer <msec> <cb>)
 ;; @param <int> 'msec' Millisecond interval
 ;; @param <fn>  'cb'   A callback function
-;; @return <int> Returns the timer id
+;; @return <string> Returns the timer id
 ;; Registers a callback <cb> to be executed one time after <msec> milliseconds.
 ;;
 ;; @example
@@ -282,4 +365,173 @@
   (assert-initialized)
   (make-event -1 0 cb nil msec))
 
+;-------------------------------------------------------------------------------
+; Buffered IO
+;-------------------------------------------------------------------------------
+
+;-------------------------------------------------------------------------------
+;Wrapper functions
+;-------------------------------------------------------------------------------
+(define (buffer-create socket , buffer)
+  (assert-initialized)
+  (setf buffer (bufferevent_socket_new BASE socket BUFFER_OPT_DEFER_CALLBACKS))
+  (and (not (zero? buffer)) buffer))
+
+(define (buffer-free buffer)
+  (bufferevent_free buffer))
+
+(define (buffer-enable buffer ev)
+  (assert-initialized)
+  (zero? (bufferevent_enable buffer ev)))
+
+(define (buffer-disable buffer ev)
+  (assert-initialized)
+  (zero? (bufferevent_disable buffer ev)))
+
+(define (buffer-read buffer (chunk-size DEFAULT_CHUNK_SIZE) , buf bytes)
+  (assert-initialized)
+  (setf buf (dup "\000" (+ 10 chunk-size)))
+  (setf bytes (bufferevent_read buffer buf chunk-size))
+  (list bytes (get-string buf)))
+
+(define (buffer-write buffer data)
+  (assert-initialized)
+  (zero? (bufferevent_write buffer data (length data))))
+
+;-------------------------------------------------------------------------------
+;Buffered IO - callbacks
+;-------------------------------------------------------------------------------
+(define (_buffer_read buffer ctx , (bytes 1) buf id trigger?)
+  (setf id (get-string ctx))
+
+  (while (> bytes 0)
+    (map set '(bytes buf) (buffer-read buffer))
+    (write (BufferData id) buf)
+    (setf trigger? true))
+
+  (when trigger?
+    (trigger-buffer-read id))
+
+  0)
+
+(define (_buffer_write buffer ctx)
+  (buffer-disable buffer WRITE)
+  0)
+
+(define (_buffer_event buffer ev ctx , id)
+  (setf id (get-string ctx))
+
+  ; Connection terminated
+  (when (masks? ev BUFFER_EOF)
+    (trigger-buffer-read id))
+
+  (unless (masks? ev BUFFER_CONNECTED)
+    (trigger-buffer-error id ev))
+  0)
+
+(setf _buffer_read_cb  (callback '_buffer_read "void" "void*" "void*"))
+(setf _buffer_write_cb (callback '_buffer_write "void" "void*" "void*"))
+(setf _buffer_event_cb (callback '_buffer_event "void" "void*" "short int" "void*"))
+
+(define (buffer-setcb buffer ctx)
+  (assert-initialized)
+  (bufferevent_setcb buffer _buffer_read_cb _buffer_write_cb _buffer_event_cb ctx))
+
+(define (trigger-buffer-read id , marker on-success _ idx len)
+  (when (BufferCB id)
+    (map set '(marker on-success _) (BufferCB id))
+
+    ; if marker is set, find it in the data
+    (if marker
+      (let ((found (regex marker (BufferData id) 0x10000)))
+        (when found
+          (map set '(_ idx len) found)))
+      (setf idx 0 len 0))
+
+    ; if the marker was found (or was set to nil), call the on-success
+    ; callback with that slice of the data, removing it from the buffer.
+    (when idx
+      (on-success (0 (+ idx len) (BufferData id)))
+      (setf (BufferData id) ((+ idx len) (BufferData id))))))
+
+(define (trigger-buffer-error id ev , buffer data marker _ on-event)
+  (map set '(marker _ on-event) (BufferCB id))
+  (setf data (BufferData id))
+  (setf buffer (BufferEv id))
+
+  ; Clean up
+  (buffer-disable buffer (| READ WRITE))
+  (free-buffer id)
+
+  ; Callback
+  (on-event ev data))
+
+;-------------------------------------------------------------------------------
+;Buffered IO - API
+;-------------------------------------------------------------------------------
+(define (buffer-id, id)
+  (setf id (string (inc _buffer_id)))
+  (BufferID id id) ; anchor in memory
+  (list (BufferID id) (address (BufferID id))))
+
+(define (get-buffer id)
+  (BufferEv id))
+
+(define (assert-buffer id)
+  (unless (get-buffer id) (throw-error "Invalid buffer id")))
+
+;; @syntax (make-buffer <socket> <read-marker> <on-read> <on-event>)
+;; @param <int>    'socket' an open socket; must not be a pipe
+;; @param <regex>  'read-marker' a compiled regex
+;; @param <fn>     'on-read'
+;; @param <fn>     'on-event'
+;; @return <string> an id used to identify the buffer
+;; Creates a new buffer object. Configures buffer to call <on-read> whenever
+;; the buffer is able to match its contents against pre-compiled regex
+;; <read-marker>. <on-event> is triggered in the event of a disconnected
+;; socket, error, etc.
+(define (make-buffer socket read-marker on-read on-event, id id-address buffer)
+  (assert-initialized)
+  (map set '(id id-address) (buffer-id))
+
+  ; create buffer
+  (setf buffer (buffer-create socket))
+
+  ; configure buffer
+  (bufferevent_setcb buffer _buffer_read_cb _buffer_write_cb _buffer_event_cb id-address)
+
+  ; store buffer
+  (BufferData id "")   ; prepare input storage
+  (BufferEv id buffer) ; store buffer
+
+  ; configure buffer
+  (BufferCB id (list read-marker on-read on-event))
+  (when on-read
+    (buffer-enable (get-buffer id) READ))
+
+  id)
+
+;; @syntax (free-buffer <id>)
+;; @param <string> 'id' buffer id
+;; Cleans up after a buffer. The buffer is not usable after calling this
+;; routine.
+(define (free-buffer id)
+  (assert-buffer id)
+  (buffer-free buffer)
+  (BufferData id nil)
+  (BufferCB id nil)
+  (BufferID id nil)
+  (BufferEv id nil))
+
+;; @syntax (buffer-send <id> <data>)
+;; @param <string> 'id' buffer id
+;; @param <string> 'data' data to send
+;; Queues <data> to be sent along the socket transport of buffer <buffer-id>.
+(define (buffer-send id data)
+  (assert-initialized)
+  (assert-buffer id)
+  (buffer-write (get-buffer id) data)
+  (buffer-enable (get-buffer id) WRITE))
+
 (context 'MAIN)
+

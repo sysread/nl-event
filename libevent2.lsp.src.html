@@ -4,25 +4,30 @@
 <font color='#555555'>;; <font color='#308080'>@version</font> 0.1</font>
 <font color='#555555'>;; <font color='#308080'>@author</font> Jeff Ober &lt;jeffober@gmail.com&gt;</font>
 <font color='#555555'>;;</font>
-<font color='#555555'>;; The libevent module provides a thin wrapper on top of the</font>
+<font color='#555555'>;; The libevent module provides a wrapper on top of the</font>
 <font color='#555555'>;; <font color='#308080'>@link</font> http://libevent.org/ libevent2 library.</font>
 <font color='#555555'>;;</font>
 <font color='#555555'>;; TODO</font>
 <font color='#555555'>;; &lt;ul&gt;</font>
 <font color='#555555'>;;   &lt;li&gt;signals&lt;/li&gt;</font>
-<font color='#555555'>;;   &lt;li&gt;io buffers&lt;/li&gt;</font>
 <font color='#555555'>;; &lt;/ul&gt;</font>
 <font color='#555555'>;;</font>
 <font color='#555555'>;; <font color='#308080'>@example</font></font>
-<font color='#555555'>;; ; Initialize library</font>
-<font color='#555555'>;; (load "libevent2.lsp")</font>
+<font color='#555555'>;; ; ------------------------------------------------------------------------------</font>
+<font color='#555555'>;; ; Timers</font>
+<font color='#555555'>;; ; ------------------------------------------------------------------------------</font>
 <font color='#555555'>;; (libevent:init)</font>
 <font color='#555555'>;;</font>
-<font color='#555555'>;; ; Timers</font>
 <font color='#555555'>;; (libevent:set-interval 10</font>
 <font color='#555555'>;;   (fn () (println "Another 10ms have passed!")))</font>
 <font color='#555555'>;;</font>
+<font color='#555555'>;; (libevent:run)</font>
+<font color='#555555'>;;</font>
+<font color='#555555'>;;</font>
+<font color='#555555'>;; ; ------------------------------------------------------------------------------</font>
 <font color='#555555'>;; ; IO</font>
+<font color='#555555'>;; ; ------------------------------------------------------------------------------</font>
+<font color='#555555'>;; (libevent:init)</font>
 <font color='#555555'>;; (setf socket (net-connect "www.google.com" 80))</font>
 <font color='#555555'>;; (setf buffer "")</font>
 <font color='#555555'>;;</font>
@@ -45,14 +50,52 @@
 <font color='#555555'>;;             (libevent:unwatch id)</font>
 <font color='#555555'>;;             (libevent:stop)))))))</font>
 <font color='#555555'>;;</font>
-<font color='#555555'>;; ; start event loop</font>
 <font color='#555555'>;; (libevent:run)</font>
-<font color='#555555'>;;</font>
-<font color='#555555'>;; ; print results</font>
 <font color='#555555'>;; (println buffer)</font>
+<font color='#555555'>;;</font>
+<font color='#555555'>;;</font>
+<font color='#555555'>;; ; ------------------------------------------------------------------------------</font>
+<font color='#555555'>;; ; Using buffers</font>
+<font color='#555555'>;; ; ------------------------------------------------------------------------------</font>
+<font color='#555555'>;; (libevent:init)</font>
+<font color='#555555'>;; </font>
+<font color='#555555'>;; (setf html "")</font>
+<font color='#555555'>;; </font>
+<font color='#555555'>;; (define (on-read data)</font>
+<font color='#555555'>;;   (write html data))</font>
+<font color='#555555'>;; </font>
+<font color='#555555'>;; (define (on-event ev data)</font>
+<font color='#555555'>;;   (cond</font>
+<font color='#555555'>;;     ((libevent:masks? ev libevent:BUFFER_EOF)</font>
+<font color='#555555'>;;      (write html data)</font>
+<font color='#555555'>;;      (println "Disconnected")</font>
+<font color='#555555'>;;      (libevent:stop))</font>
+<font color='#555555'>;;     ((libevent:masks? ev libevent:BUFFER_ERROR)</font>
+<font color='#555555'>;;      (println "An error occurred")</font>
+<font color='#555555'>;;      (libevent:stop))</font>
+<font color='#555555'>;;     ((libevent:masks? ev libevent:BUFFER_TIMEOUT)</font>
+<font color='#555555'>;;      (println "Timed out")</font>
+<font color='#555555'>;;      (libevent:stop))))</font>
+<font color='#555555'>;; </font>
+<font color='#555555'>;; (or (setf socket (net-connect "www.google.com" 80))</font>
+<font color='#555555'>;;     (throw-error "Unable to connect"))</font>
+<font color='#555555'>;; </font>
+<font color='#555555'>;; (setf buffer (libevent:make-buffer socket (regex-comp "[&#092;r&#092;n]+" 4) on-read on-event))</font>
+<font color='#555555'>;; (libevent:buffer-send buffer "GET / HTTP/1.0&#092;r&#092;n&#092;r&#092;n")</font>
+<font color='#555555'>;; (libevent:run)</font>
+<font color='#555555'>;; </font>
+<font color='#555555'>;; (println html)</font>
 
-<font color='#AA0000'>(</font><font color='#0000AA'>define</font> EventCB:EventCB<font color='#AA0000'>)</font>
+<font color='#555555'>;-------------------------------------------------------------------------------</font>
+<font color='#555555'>;Data storage</font>
+<font color='#555555'>;-------------------------------------------------------------------------------</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>define</font> EventID:EventID<font color='#AA0000'>)</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> EventCB:EventCB<font color='#AA0000'>)</font>
+
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> BufferID:BufferID<font color='#AA0000'>)</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> BufferCB:BufferCB<font color='#AA0000'>)</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> BufferEv:BufferEv<font color='#AA0000'>)</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> BufferData:BufferData<font color='#AA0000'>)</font>
 
 <font color='#AA0000'>(</font><font color='#0000AA'>context</font> 'libevent<font color='#AA0000'>)</font>
 
@@ -61,16 +104,37 @@
 <font color='#555555'>;-------------------------------------------------------------------------------</font>
 <font color='#555555'>; Constants (from event.h)</font>
 <font color='#555555'>;-------------------------------------------------------------------------------</font>
-<font color='#555555'>;; <font color='#308080'>@syntax</font> READ</font>
-<font color='#555555'>;; Event constant triggered when data is available to read.</font>
-<font color='#555555'>;;</font>
-<font color='#555555'>;; <font color='#308080'>@syntax</font> WRITE</font>
-<font color='#555555'>;; Event constant triggered when data is available to write.</font>
+<font color='#555555'>;; &lt;h3&gt;Event constants&lt;/h3&gt;</font>
+<font color='#555555'>;; <font color='#308080'>@const</font> READ</font>
+<font color='#555555'>;; <font color='#308080'>@const</font> WRITE</font>
+<font color='#555555'>;; <font color='#308080'>@const</font> TIMEOUT</font>
+<font color='#555555'>;; <font color='#308080'>@const</font> SIGNAL</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>constant</font> 'TIMEOUT   <font color='#665500'>0x01</font><font color='#AA0000'>)</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>constant</font> 'READ      <font color='#665500'>0x02</font><font color='#AA0000'>)</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>constant</font> 'WRITE     <font color='#665500'>0x04</font><font color='#AA0000'>)</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>constant</font> 'SIGNAL    <font color='#665500'>0x08</font><font color='#AA0000'>)</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>constant</font> 'PERSIST   <font color='#665500'>0x10</font><font color='#AA0000'>)</font>
+
+<font color='#555555'>; Buffer events</font>
+<font color='#555555'>;; &lt;h3&gt;Buffer constants&lt;/h3&gt;</font>
+<font color='#555555'>;; <font color='#308080'>@const</font> BUFFER_READING</font>
+<font color='#555555'>;; <font color='#308080'>@const</font> BUFFER_WRITING</font>
+<font color='#555555'>;; <font color='#308080'>@const</font> BUFFER_EOF</font>
+<font color='#555555'>;; <font color='#308080'>@const</font> BUFFER_ERROR</font>
+<font color='#555555'>;; <font color='#308080'>@const</font> BUFFER_TIMEOUT</font>
+<font color='#555555'>;; <font color='#308080'>@const</font> BUFFER_CONNECTED</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>constant</font> 'BUFFER_READING   <font color='#665500'>0x01</font><font color='#AA0000'>)</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>constant</font> 'BUFFER_WRITING   <font color='#665500'>0x02</font><font color='#AA0000'>)</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>constant</font> 'BUFFER_EOF       <font color='#665500'>0x10</font><font color='#AA0000'>)</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>constant</font> 'BUFFER_ERROR     <font color='#665500'>0x20</font><font color='#AA0000'>)</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>constant</font> 'BUFFER_TIMEOUT   <font color='#665500'>0x40</font><font color='#AA0000'>)</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>constant</font> 'BUFFER_CONNECTED <font color='#665500'>0x80</font><font color='#AA0000'>)</font>
+
+<font color='#555555'>; Buffer options</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>constant</font> 'BUFFER_OPT_DEFER_CALLBACKS <font color='#AA0000'>(</font><font color='#0000AA'><<</font> <font color='#665500'>1</font> <font color='#665500'>2</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+<font color='#555555'>; Defaults</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>constant</font> 'DEFAULT_CHUNK_SIZE <font color='#665500'>1024</font><font color='#AA0000'>)</font>
 
 <font color='#555555'>;-------------------------------------------------------------------------------</font>
 <font color='#555555'>; Locate libevent library</font>
@@ -92,13 +156,28 @@
 <font color='#AA0000'>(</font><font color='#0000AA'>import</font> LIB <font color='#008800'>"event_base_free"</font> <font color='#008800'>"void"</font> <font color='#008800'>"void*"</font><font color='#AA0000'>)</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>import</font> LIB <font color='#008800'>"event_base_dispatch"</font> <font color='#008800'>"int"</font> <font color='#008800'>"void*"</font><font color='#AA0000'>)</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>import</font> LIB <font color='#008800'>"event_base_loopbreak"</font> <font color='#008800'>"int"</font> <font color='#008800'>"void*"</font><font color='#AA0000'>)</font>
+
 <font color='#AA0000'>(</font><font color='#0000AA'>import</font> LIB <font color='#008800'>"event_new"</font> <font color='#008800'>"void*"</font> <font color='#008800'>"void*"</font> <font color='#008800'>"int"</font> <font color='#008800'>"short int"</font> <font color='#008800'>"void*"</font> <font color='#008800'>"void*"</font><font color='#AA0000'>)</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>import</font> LIB <font color='#008800'>"event_free"</font> <font color='#008800'>"void"</font> <font color='#008800'>"void*"</font><font color='#AA0000'>)</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>import</font> LIB <font color='#008800'>"event_add"</font> <font color='#008800'>"int"</font> <font color='#008800'>"void*"</font> <font color='#008800'>"void*"</font><font color='#AA0000'>)</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>import</font> LIB <font color='#008800'>"event_del"</font> <font color='#008800'>"int"</font> <font color='#008800'>"void*"</font><font color='#AA0000'>)</font>
 
+<font color='#AA0000'>(</font><font color='#0000AA'>import</font> LIB <font color='#008800'>"bufferevent_socket_new"</font> <font color='#008800'>"void*"</font> <font color='#008800'>"void*"</font> <font color='#008800'>"int"</font> <font color='#008800'>"int"</font><font color='#AA0000'>)</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>import</font> LIB <font color='#008800'>"bufferevent_free"</font> <font color='#008800'>"void"</font> <font color='#008800'>"void*"</font><font color='#AA0000'>)</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>import</font> LIB <font color='#008800'>"bufferevent_enable"</font> <font color='#008800'>"int"</font> <font color='#008800'>"void*"</font> <font color='#008800'>"short int"</font><font color='#AA0000'>)</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>import</font> LIB <font color='#008800'>"bufferevent_disable"</font> <font color='#008800'>"int"</font> <font color='#008800'>"void*"</font> <font color='#008800'>"short int"</font><font color='#AA0000'>)</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>import</font> LIB <font color='#008800'>"bufferevent_read"</font> <font color='#008800'>"int"</font> <font color='#008800'>"void*"</font> <font color='#008800'>"void*"</font> <font color='#008800'>"int"</font><font color='#AA0000'>)</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>import</font> LIB <font color='#008800'>"bufferevent_write"</font> <font color='#008800'>"int"</font> <font color='#008800'>"void*"</font> <font color='#008800'>"void*"</font> <font color='#008800'>"int"</font><font color='#AA0000'>)</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>import</font> LIB <font color='#008800'>"bufferevent_setcb"</font> <font color='#008800'>"void"</font> <font color='#008800'>"void*"</font> <font color='#008800'>"void*"</font> <font color='#008800'>"void*"</font> <font color='#008800'>"void*"</font> <font color='#008800'>"void*"</font><font color='#AA0000'>)</font>
+
 <font color='#AA0000'>(</font><font color='#0000AA'>when</font> MAIN:LIBEVENT2_DEBUG
   <font color='#AA0000'>(</font>event_enable_debug_mode<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+<font color='#555555'>;-------------------------------------------------------------------------------</font>
+<font color='#555555'>;Utilities</font>
+<font color='#555555'>;-------------------------------------------------------------------------------</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>masks? a b<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>not</font> <font color='#AA0000'>(</font><font color='#0000AA'>zero?</font> <font color='#AA0000'>(</font><font color='#0000AA'>&amp;</font> a b<font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
 
 <font color='#555555'>;-------------------------------------------------------------------------------</font>
 <font color='#555555'>; Loop control</font>
@@ -114,10 +193,15 @@
       <font color='#AA0000'>(</font><font color='#0000AA'>not</font> <font color='#AA0000'>(</font><font color='#0000AA'>zero?</font> <font color='#AA0000'>(</font><font color='#0000AA'>setf</font> BASE <font color='#AA0000'>(</font>event_base_new<font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
       <font color='#AA0000'>(</font><font color='#0000AA'>throw-error</font> <font color='#008800'>"Error initializing event loop"</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
 
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>initialized?<font color='#AA0000'>)</font>
+  <font color='#008800'>"Returns true if libevent has been initialized."</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>true?</font> BASE<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
 <font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>assert-initialized<font color='#AA0000'>)</font>
   "Convenience routine to <font color='#0000AA'>throw</font> an error <font color='#0000AA'>if</font> the library has <font color='#0000AA'>not</font> yet been
   initialized."
-  <font color='#AA0000'>(</font><font color='#0000AA'>or</font> BASE <font color='#AA0000'>(</font><font color='#0000AA'>throw-error</font> <font color='#008800'>"Event loop is not initialized"</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>unless</font> <font color='#AA0000'>(</font>initialized?<font color='#AA0000'>)</font>
+    <font color='#AA0000'>(</font><font color='#0000AA'>throw-error</font> <font color='#008800'>"Event loop is not initialized"</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
 
 <font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>cleanup<font color='#AA0000'>)</font>
   <font color='#008800'>"Cleans up memory used by the event loop."</font>
@@ -146,11 +230,10 @@
 <font color='#555555'>;-------------------------------------------------------------------------------</font>
 <font color='#555555'>; Event callback triggering</font>
 <font color='#555555'>;-------------------------------------------------------------------------------</font>
-<font color='#AA0000'>(</font><font color='#0000AA'>setf</font> _id <font color='#665500'>0</font><font color='#AA0000'>)</font>
 <font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>event-id , id<font color='#AA0000'>)</font>
   "Generates an id <font color='#0000AA'>for</font> the event, anchored in memory using a tree, that is used
   to locate the event object from the callback."
-  <font color='#AA0000'>(</font><font color='#0000AA'>setf</font> id <font color='#AA0000'>(</font><font color='#0000AA'>string</font> <font color='#008800'>"ev-"</font> <font color='#AA0000'>(</font><font color='#0000AA'>inc</font> _id<font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>setf</font> id <font color='#AA0000'>(</font><font color='#0000AA'>string</font> <font color='#AA0000'>(</font><font color='#0000AA'>inc</font> _event_id<font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
   <font color='#AA0000'>(</font>EventID id id<font color='#AA0000'>)</font> <font color='#555555'>; anchor in memory</font>
   <font color='#AA0000'>(</font><font color='#0000AA'>list</font> <font color='#AA0000'>(</font>EventID id<font color='#AA0000'>)</font> <font color='#AA0000'>(</font><font color='#0000AA'>address</font> <font color='#AA0000'>(</font>EventID id<font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
 
@@ -193,7 +276,7 @@
 <font color='#555555'>;; <font color='#308080'>@param</font> &lt;int&gt;  'ev'   A bitmask of event constants</font>
 <font color='#555555'>;; <font color='#308080'>@param</font> &lt;fn&gt;   'cb'   A callback function</font>
 <font color='#555555'>;; <font color='#308080'>@param</font> &lt;bool&gt; 'once' When true (default false) callback is triggered only once</font>
-<font color='#555555'>;; <font color='#308080'>@return</font> &lt;int&gt; id used to manage the event watcher</font>
+<font color='#555555'>;; <font color='#308080'>@return</font> &lt;string&gt; id used to manage the event watcher</font>
 <font color='#555555'>;; Registers callback function &lt;cb&gt; to be called whenever an event masked in</font>
 <font color='#555555'>;; &lt;ev&gt; is triggered for &lt;fd&gt;. &lt;cb&gt; is called with the file descriptor,</font>
 <font color='#555555'>;; event, and id as its arguments.</font>
@@ -209,7 +292,7 @@
   <font color='#AA0000'>(</font>make-event fd ev cb once<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
 
 <font color='#555555'>;; <font color='#308080'>@syntax</font> (unwatch &lt;id&gt;)</font>
-<font color='#555555'>;; <font color='#308080'>@param</font> &lt;int&gt; 'id' ID returned by &lt;watch&gt;</font>
+<font color='#555555'>;; <font color='#308080'>@param</font> &lt;string&gt; 'id' ID returned by &lt;watch&gt;</font>
 <font color='#555555'>;; Unregisters an event watcher. Once unwatched, the watcher id is invalid</font>
 <font color='#555555'>;; and may no longer be used.</font>
 <font color='#555555'>;;</font>
@@ -245,7 +328,7 @@
 <font color='#555555'>;; <font color='#308080'>@syntax</font> (set-interval &lt;msec&gt; &lt;cb&gt;)</font>
 <font color='#555555'>;; <font color='#308080'>@param</font> &lt;int&gt; 'msec' Millisecond interval</font>
 <font color='#555555'>;; <font color='#308080'>@param</font> &lt;fn&gt;  'cb'   A callback function</font>
-<font color='#555555'>;; <font color='#308080'>@return</font> &lt;int&gt; Returns the timer id</font>
+<font color='#555555'>;; <font color='#308080'>@return</font> &lt;string&gt; Returns the timer id</font>
 <font color='#555555'>;; Registers a callback &lt;cb&gt; to be executed every &lt;msec&gt; milliseconds. Note</font>
 <font color='#555555'>;; that the timing is not guaranteed; &lt;cb&gt; will be called on the first</font>
 <font color='#555555'>;; iteration of the event loop after &lt;msec&gt; milliseconds have passed since its</font>
@@ -259,7 +342,7 @@
   <font color='#AA0000'>(</font>make-event <font color='#665500'>-1</font> <font color='#AA0000'>(</font><font color='#0000AA'>|</font> <font color='#665500'>0</font> PERSIST<font color='#AA0000'>)</font> cb <font color='#0000AA'>nil</font> msec<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
 
 <font color='#555555'>;; <font color='#308080'>@syntax</font> (clear-interval &lt;id&gt;)</font>
-<font color='#555555'>;; <font color='#308080'>@param</font> &lt;int&gt; 'id' id of a timer event</font>
+<font color='#555555'>;; <font color='#308080'>@param</font> &lt;string&gt; 'id' id of a timer event</font>
 <font color='#555555'>;; Clears an interval id.</font>
 <font color='#555555'>;;</font>
 <font color='#555555'>;; <font color='#308080'>@example</font></font>
@@ -274,7 +357,7 @@
 <font color='#555555'>;; <font color='#308080'>@syntax</font> (set-timer &lt;msec&gt; &lt;cb&gt;)</font>
 <font color='#555555'>;; <font color='#308080'>@param</font> &lt;int&gt; 'msec' Millisecond interval</font>
 <font color='#555555'>;; <font color='#308080'>@param</font> &lt;fn&gt;  'cb'   A callback function</font>
-<font color='#555555'>;; <font color='#308080'>@return</font> &lt;int&gt; Returns the timer id</font>
+<font color='#555555'>;; <font color='#308080'>@return</font> &lt;string&gt; Returns the timer id</font>
 <font color='#555555'>;; Registers a callback &lt;cb&gt; to be executed one time after &lt;msec&gt; milliseconds.</font>
 <font color='#555555'>;;</font>
 <font color='#555555'>;; <font color='#308080'>@example</font></font>
@@ -283,7 +366,176 @@
   <font color='#AA0000'>(</font>assert-initialized<font color='#AA0000'>)</font>
   <font color='#AA0000'>(</font>make-event <font color='#665500'>-1</font> <font color='#665500'>0</font> cb <font color='#0000AA'>nil</font> msec<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
 
+<font color='#555555'>;-------------------------------------------------------------------------------</font>
+<font color='#555555'>; Buffered IO</font>
+<font color='#555555'>;-------------------------------------------------------------------------------</font>
+
+<font color='#555555'>;-------------------------------------------------------------------------------</font>
+<font color='#555555'>;Wrapper functions</font>
+<font color='#555555'>;-------------------------------------------------------------------------------</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>buffer-create socket , buffer<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font>assert-initialized<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>setf</font> buffer <font color='#AA0000'>(</font>bufferevent_socket_new BASE socket BUFFER_OPT_DEFER_CALLBACKS<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>and</font> <font color='#AA0000'>(</font><font color='#0000AA'>not</font> <font color='#AA0000'>(</font><font color='#0000AA'>zero?</font> buffer<font color='#AA0000'>)</font><font color='#AA0000'>)</font> buffer<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>buffer-free buffer<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font>bufferevent_free buffer<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>buffer-enable buffer ev<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font>assert-initialized<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>zero?</font> <font color='#AA0000'>(</font>bufferevent_enable buffer ev<font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>buffer-disable buffer ev<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font>assert-initialized<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>zero?</font> <font color='#AA0000'>(</font>bufferevent_disable buffer ev<font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>buffer-read buffer <font color='#AA0000'>(</font>chunk-size DEFAULT_CHUNK_SIZE<font color='#AA0000'>)</font> , buf bytes<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font>assert-initialized<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>setf</font> buf <font color='#AA0000'>(</font><font color='#0000AA'>dup</font> <font color='#008800'>"&#092;000"</font> <font color='#AA0000'>(</font><font color='#0000AA'>+</font> <font color='#665500'>10</font> chunk-size<font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>setf</font> bytes <font color='#AA0000'>(</font>bufferevent_read buffer buf chunk-size<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>list</font> bytes <font color='#AA0000'>(</font><font color='#0000AA'>get-string</font> buf<font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>buffer-write buffer data<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font>assert-initialized<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>zero?</font> <font color='#AA0000'>(</font>bufferevent_write buffer data <font color='#AA0000'>(</font><font color='#0000AA'>length</font> data<font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+<font color='#555555'>;-------------------------------------------------------------------------------</font>
+<font color='#555555'>;Buffered IO - callbacks</font>
+<font color='#555555'>;-------------------------------------------------------------------------------</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>_buffer_read buffer ctx , <font color='#AA0000'>(</font>bytes <font color='#665500'>1</font><font color='#AA0000'>)</font> buf id trigger?<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>setf</font> id <font color='#AA0000'>(</font><font color='#0000AA'>get-string</font> ctx<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+  <font color='#AA0000'>(</font><font color='#0000AA'>while</font> <font color='#AA0000'>(</font><font color='#0000AA'>></font> bytes <font color='#665500'>0</font><font color='#AA0000'>)</font>
+    <font color='#AA0000'>(</font><font color='#0000AA'>map</font> <font color='#0000AA'>set</font> '<font color='#AA0000'>(</font>bytes buf<font color='#AA0000'>)</font> <font color='#AA0000'>(</font>buffer-read buffer<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+    <font color='#AA0000'>(</font><font color='#0000AA'>write</font> <font color='#AA0000'>(</font>BufferData id<font color='#AA0000'>)</font> buf<font color='#AA0000'>)</font>
+    <font color='#AA0000'>(</font><font color='#0000AA'>setf</font> trigger? <font color='#0000AA'>true</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+  <font color='#AA0000'>(</font><font color='#0000AA'>when</font> trigger?
+    <font color='#AA0000'>(</font>trigger-buffer-read id<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+  <font color='#665500'>0</font><font color='#AA0000'>)</font>
+
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>_buffer_write buffer ctx<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font>buffer-disable buffer WRITE<font color='#AA0000'>)</font>
+  <font color='#665500'>0</font><font color='#AA0000'>)</font>
+
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>_buffer_event buffer ev ctx , id<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>setf</font> id <font color='#AA0000'>(</font><font color='#0000AA'>get-string</font> ctx<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+  <font color='#555555'>; Connection terminated</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>when</font> <font color='#AA0000'>(</font>masks? ev BUFFER_EOF<font color='#AA0000'>)</font>
+    <font color='#AA0000'>(</font>trigger-buffer-read id<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+  <font color='#AA0000'>(</font><font color='#0000AA'>unless</font> <font color='#AA0000'>(</font>masks? ev BUFFER_CONNECTED<font color='#AA0000'>)</font>
+    <font color='#AA0000'>(</font>trigger-buffer-error id ev<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+  <font color='#665500'>0</font><font color='#AA0000'>)</font>
+
+<font color='#AA0000'>(</font><font color='#0000AA'>setf</font> _buffer_read_cb  <font color='#AA0000'>(</font><font color='#0000AA'>callback</font> '_buffer_read <font color='#008800'>"void"</font> <font color='#008800'>"void*"</font> <font color='#008800'>"void*"</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>setf</font> _buffer_write_cb <font color='#AA0000'>(</font><font color='#0000AA'>callback</font> '_buffer_write <font color='#008800'>"void"</font> <font color='#008800'>"void*"</font> <font color='#008800'>"void*"</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>setf</font> _buffer_event_cb <font color='#AA0000'>(</font><font color='#0000AA'>callback</font> '_buffer_event <font color='#008800'>"void"</font> <font color='#008800'>"void*"</font> <font color='#008800'>"short int"</font> <font color='#008800'>"void*"</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>buffer-setcb buffer ctx<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font>assert-initialized<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font>bufferevent_setcb buffer _buffer_read_cb _buffer_write_cb _buffer_event_cb ctx<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>trigger-buffer-read id , marker on-success _ idx len<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>when</font> <font color='#AA0000'>(</font>BufferCB id<font color='#AA0000'>)</font>
+    <font color='#AA0000'>(</font><font color='#0000AA'>map</font> <font color='#0000AA'>set</font> '<font color='#AA0000'>(</font>marker on-success _<font color='#AA0000'>)</font> <font color='#AA0000'>(</font>BufferCB id<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+    <font color='#555555'>; if marker is set, find it in the data</font>
+    <font color='#AA0000'>(</font><font color='#0000AA'>if</font> marker
+      <font color='#AA0000'>(</font><font color='#0000AA'>let</font> <font color='#AA0000'>(</font><font color='#AA0000'>(</font>found <font color='#AA0000'>(</font><font color='#0000AA'>regex</font> marker <font color='#AA0000'>(</font>BufferData id<font color='#AA0000'>)</font> <font color='#665500'>0x10000</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+        <font color='#AA0000'>(</font><font color='#0000AA'>when</font> found
+          <font color='#AA0000'>(</font><font color='#0000AA'>map</font> <font color='#0000AA'>set</font> '<font color='#AA0000'>(</font>_ idx len<font color='#AA0000'>)</font> found<font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+      <font color='#AA0000'>(</font><font color='#0000AA'>setf</font> idx <font color='#665500'>0</font> len <font color='#665500'>0</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+    <font color='#555555'>; if the marker was found (or was set to nil), call the on-success</font>
+    <font color='#555555'>; callback with that slice of the data, removing it from the buffer.</font>
+    <font color='#AA0000'>(</font><font color='#0000AA'>when</font> idx
+      <font color='#AA0000'>(</font>on-success <font color='#AA0000'>(</font><font color='#665500'>0</font> <font color='#AA0000'>(</font><font color='#0000AA'>+</font> idx len<font color='#AA0000'>)</font> <font color='#AA0000'>(</font>BufferData id<font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+      <font color='#AA0000'>(</font><font color='#0000AA'>setf</font> <font color='#AA0000'>(</font>BufferData id<font color='#AA0000'>)</font> <font color='#AA0000'>(</font><font color='#AA0000'>(</font><font color='#0000AA'>+</font> idx len<font color='#AA0000'>)</font> <font color='#AA0000'>(</font>BufferData id<font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>trigger-buffer-error id ev , buffer data marker _ on-event<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>map</font> <font color='#0000AA'>set</font> '<font color='#AA0000'>(</font>marker _ on-event<font color='#AA0000'>)</font> <font color='#AA0000'>(</font>BufferCB id<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>setf</font> data <font color='#AA0000'>(</font>BufferData id<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>setf</font> buffer <font color='#AA0000'>(</font>BufferEv id<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+  <font color='#555555'>; Clean up</font>
+  <font color='#AA0000'>(</font>buffer-disable buffer <font color='#AA0000'>(</font><font color='#0000AA'>|</font> READ WRITE<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font>free-buffer id<font color='#AA0000'>)</font>
+
+  <font color='#555555'>; Callback</font>
+  <font color='#AA0000'>(</font>on-event ev data<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+<font color='#555555'>;-------------------------------------------------------------------------------</font>
+<font color='#555555'>;Buffered IO - API</font>
+<font color='#555555'>;-------------------------------------------------------------------------------</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>buffer-id, id<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>setf</font> id <font color='#AA0000'>(</font><font color='#0000AA'>string</font> <font color='#AA0000'>(</font><font color='#0000AA'>inc</font> _buffer_id<font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font>BufferID id id<font color='#AA0000'>)</font> <font color='#555555'>; anchor in memory</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>list</font> <font color='#AA0000'>(</font>BufferID id<font color='#AA0000'>)</font> <font color='#AA0000'>(</font><font color='#0000AA'>address</font> <font color='#AA0000'>(</font>BufferID id<font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>get-buffer id<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font>BufferEv id<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>assert-buffer id<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>unless</font> <font color='#AA0000'>(</font>get-buffer id<font color='#AA0000'>)</font> <font color='#AA0000'>(</font><font color='#0000AA'>throw-error</font> <font color='#008800'>"Invalid buffer id"</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+<font color='#555555'>;; <font color='#308080'>@syntax</font> (make-buffer &lt;socket&gt; &lt;read-marker&gt; &lt;on-read&gt; &lt;on-event&gt;)</font>
+<font color='#555555'>;; <font color='#308080'>@param</font> &lt;int&gt;    'socket' an open socket; must not be a pipe</font>
+<font color='#555555'>;; <font color='#308080'>@param</font> &lt;regex&gt;  'read-marker' a compiled regex</font>
+<font color='#555555'>;; <font color='#308080'>@param</font> &lt;fn&gt;     'on-read'</font>
+<font color='#555555'>;; <font color='#308080'>@param</font> &lt;fn&gt;     'on-event'</font>
+<font color='#555555'>;; <font color='#308080'>@return</font> &lt;string&gt; an id used to identify the buffer</font>
+<font color='#555555'>;; Creates a new buffer object. Configures buffer to call &lt;on-read&gt; whenever</font>
+<font color='#555555'>;; the buffer is able to match its contents against pre-compiled regex</font>
+<font color='#555555'>;; &lt;read-marker&gt;. &lt;on-event&gt; is triggered in the event of a disconnected</font>
+<font color='#555555'>;; socket, error, etc.</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>make-buffer socket read-marker on-read on-event, id id-address buffer<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font>assert-initialized<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>map</font> <font color='#0000AA'>set</font> '<font color='#AA0000'>(</font>id id-address<font color='#AA0000'>)</font> <font color='#AA0000'>(</font>buffer-id<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+  <font color='#555555'>; create buffer</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>setf</font> buffer <font color='#AA0000'>(</font>buffer-create socket<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+  <font color='#555555'>; configure buffer</font>
+  <font color='#AA0000'>(</font>bufferevent_setcb buffer _buffer_read_cb _buffer_write_cb _buffer_event_cb id-address<font color='#AA0000'>)</font>
+
+  <font color='#555555'>; store buffer</font>
+  <font color='#AA0000'>(</font>BufferData id <font color='#008800'>""</font><font color='#AA0000'>)</font>   <font color='#555555'>; prepare input storage</font>
+  <font color='#AA0000'>(</font>BufferEv id buffer<font color='#AA0000'>)</font> <font color='#555555'>; store buffer</font>
+
+  <font color='#555555'>; configure buffer</font>
+  <font color='#AA0000'>(</font>BufferCB id <font color='#AA0000'>(</font><font color='#0000AA'>list</font> read-marker on-read on-event<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font><font color='#0000AA'>when</font> on-read
+    <font color='#AA0000'>(</font>buffer-enable <font color='#AA0000'>(</font>get-buffer id<font color='#AA0000'>)</font> READ<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+  id<font color='#AA0000'>)</font>
+
+<font color='#555555'>;; <font color='#308080'>@syntax</font> (free-buffer &lt;id&gt;)</font>
+<font color='#555555'>;; <font color='#308080'>@param</font> &lt;string&gt; 'id' buffer id</font>
+<font color='#555555'>;; Cleans up after a buffer. The buffer is not usable after calling this</font>
+<font color='#555555'>;; routine.</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>free-buffer id<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font>assert-buffer id<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font>buffer-free buffer<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font>BufferData id <font color='#0000AA'>nil</font><font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font>BufferCB id <font color='#0000AA'>nil</font><font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font>BufferID id <font color='#0000AA'>nil</font><font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font>BufferEv id <font color='#0000AA'>nil</font><font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
+<font color='#555555'>;; <font color='#308080'>@syntax</font> (buffer-send &lt;id&gt; &lt;data&gt;)</font>
+<font color='#555555'>;; <font color='#308080'>@param</font> &lt;string&gt; 'id' buffer id</font>
+<font color='#555555'>;; <font color='#308080'>@param</font> &lt;string&gt; 'data' data to send</font>
+<font color='#555555'>;; Queues &lt;data&gt; to be sent along the socket transport of buffer &lt;buffer-id&gt;.</font>
+<font color='#AA0000'>(</font><font color='#0000AA'>define</font> <font color='#AA0000'>(</font>buffer-send id data<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font>assert-initialized<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font>assert-buffer id<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font>buffer-write <font color='#AA0000'>(</font>get-buffer id<font color='#AA0000'>)</font> data<font color='#AA0000'>)</font>
+  <font color='#AA0000'>(</font>buffer-enable <font color='#AA0000'>(</font>get-buffer id<font color='#AA0000'>)</font> WRITE<font color='#AA0000'>)</font><font color='#AA0000'>)</font>
+
 <font color='#AA0000'>(</font><font color='#0000AA'>context</font> 'MAIN<font color='#AA0000'>)</font>
+
 
 
 </pre><center><font face='Arial' size='-3' color='#666666'>syntax highlighting with <a href="http://newlisp.org">newLISP</a>&nbsp;and <a href="http://newlisp.org/newLISPdoc.html">newLISPdoc</a></font></center></body></html>
