@@ -10,10 +10,8 @@ Todo
 * Signals
 
 
-Summary
+Timers
 --------------------------------------------------------------------------------
-    (load "libevent2.lsp")
-
     ; --------------------------------------------------------------------------
     ; Timers
     ; --------------------------------------------------------------------------
@@ -25,9 +23,8 @@ Summary
     (libevent:run)
 
 
-    ; --------------------------------------------------------------------------
-    ; IO
-    ; --------------------------------------------------------------------------
+Events
+--------------------------------------------------------------------------------
     (libevent:init)
     (setf socket (net-connect "www.google.com" 80))
     (setf buffer "")
@@ -55,9 +52,8 @@ Summary
     (println buffer)
 
 
-    ; --------------------------------------------------------------------------
-    ; Using buffers
-    ; --------------------------------------------------------------------------
+Buffers
+--------------------------------------------------------------------------------
     (libevent:init)
     
     (setf html "")
@@ -86,4 +82,13 @@ Summary
     (libevent:run)
     
     (println html)
+
+
+License
+--------------------------------------------------------------------------------
+Copyright (C) 2012 "Jeff Ober"
+
+This program is free software; you can redistribute it and/or modify it
+under the terms of either: the GNU General Public License as published
+by the Free Software Foundation; or the Artistic License.
 
